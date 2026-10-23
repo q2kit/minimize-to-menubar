@@ -1,0 +1,9 @@
+{
+  "uuid": "minimize-to-menubar@local",
+  "name": "Minimize to Menu Bar",
+  "description": "Hide the focused window with a shortcut and keep it in a per-app top bar menu instead of the dock.",
+  "shell-version": ["50"],
+  "session-modes": ["user", "unlock-dialog"],
+  "settings-schema": "org.gnome.shell.extensions.minimize-to-menubar",
+  "version": 1
+}

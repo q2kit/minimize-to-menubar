@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.minimize-to-menubar"
+          path="/org/gnome/shell/extensions/minimize-to-menubar/">
+    <key name="minimize-to-menubar-hide" type="as">
+      <default><![CDATA[['<Super>h']]]></default>
+      <summary>Hide the focused window to the top bar</summary>
+    </key>
+    <key name="minimize-to-menubar-restore" type="as">
+      <default><![CDATA[['<Super><Shift>h']]]></default>
+      <summary>Restore the most recently hidden window</summary>
+    </key>
+    <key name="released-shortcuts" type="s">
+      <default>'[]'</default>
+      <summary>Conflicting system shortcuts taken over by this extension</summary>
+      <description>JSON list of {schema, key, accels}, given back when the extension is disabled.</description>
+    </key>
+  </schema>
+</schemalist>
