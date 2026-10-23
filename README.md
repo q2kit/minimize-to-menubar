@@ -198,3 +198,8 @@ Makefile              # install / uninstall / pack
   notifications for it.
 - The dock integration relies on how Ubuntu Dock filters windows today, which
   could change in a future release.
+
+## License
+
+[GPL-2.0-or-later](LICENSE), the same license GNOME Shell and most of its
+extensions use.
