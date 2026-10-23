@@ -10,6 +10,10 @@
       <default><![CDATA[['<Super><Shift>h']]]></default>
       <summary>Restore the most recently hidden window</summary>
     </key>
+    <key name="minimize-to-menubar-restore-all" type="as">
+      <default><![CDATA[['<Super><Ctrl><Shift>h']]]></default>
+      <summary>Restore all hidden windows</summary>
+    </key>
     <key name="released-shortcuts" type="s">
       <default>'[]'</default>
       <summary>Conflicting system shortcuts taken over by this extension</summary>

@@ -16,7 +16,15 @@ import {Extension, InjectionManager} from 'resource:///org/gnome/shell/extension
 // these, so reporting hidden windows as skip-taskbar removes them everywhere.
 const SKIP_TASKBAR_PROPS = ['skip_taskbar', 'skipTaskbar'];
 
-const KEYBINDINGS = ['minimize-to-menubar-hide', 'minimize-to-menubar-restore'];
+const KEYBINDINGS = [
+    'minimize-to-menubar-hide',
+    'minimize-to-menubar-restore',
+    'minimize-to-menubar-restore-all',
+];
+
+// Tray icons from the AppIndicator extension sit next to ours; follow its
+// compact mode so all of them get the same padding.
+const APPINDICATOR_SCHEMA = 'org.gnome.shell.extensions.appindicator';
 
 // System shortcuts that may already use our accelerators (e.g. Super+H is
 // minimize by default); we take those over while enabled.
@@ -41,12 +49,17 @@ class AppIndicator extends PanelMenu.Button {
         this._onActivate = onActivate;
         this._windows = [];
 
+        // The theme drops the icon's own padding inside this box, giving the
+        // same round highlight as other tray icons.
+        const box = new St.BoxLayout({style_class: 'panel-status-indicators-box'});
         const icon = new St.Icon({style_class: 'system-status-icon'});
         if (gicon)
             icon.gicon = gicon;
         else
             icon.icon_name = 'application-x-executable-symbolic';
-        this.add_child(icon);
+        box.add_child(icon);
+        this.add_child(box);
+        this._icon = icon;
 
         // Clicks (and keyboard activation) end up in menu.toggle(); with a
         // single hidden window there is nothing to choose, so restore it.
@@ -57,6 +70,12 @@ class AppIndicator extends PanelMenu.Button {
             else
                 toggle();
         };
+    }
+
+    // Same styles AppIndicator applies in compact mode.
+    setCompact(compact) {
+        this.set_style(compact ? '-natural-hpadding: 10px' : null);
+        this._icon.set_style(compact ? 'margin: 0' : null);
     }
 
     get isEmpty() {
@@ -112,6 +131,7 @@ export default class MinimizeToMenuBarExtension extends Extension {
         this._settings.connectObject(
             'changed::minimize-to-menubar-hide', () => this._releaseConflictingShortcuts(),
             'changed::minimize-to-menubar-restore', () => this._releaseConflictingShortcuts(),
+            'changed::minimize-to-menubar-restore-all', () => this._releaseConflictingShortcuts(),
             this);
 
         Main.wm.addKeybinding('minimize-to-menubar-hide', this._settings,
@@ -120,15 +140,33 @@ export default class MinimizeToMenuBarExtension extends Extension {
         Main.wm.addKeybinding('minimize-to-menubar-restore', this._settings,
             Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL,
             () => this._restoreLatestWindow());
+        Main.wm.addKeybinding('minimize-to-menubar-restore-all', this._settings,
+            Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL,
+            () => this._restoreAllWindows());
 
         // Extension indicators stay in the panel on the lock screen, so hide
         // them there to avoid leaking window titles.
         Main.sessionMode.connectObject('updated',
             () => this._syncIndicatorVisibility(), this);
+
+        const traySchema = Gio.SettingsSchemaSource.get_default()
+            ?.lookup(APPINDICATOR_SCHEMA, true);
+        this._traySettings = traySchema
+            ? new Gio.Settings({settings_schema: traySchema}) : null;
+        this._traySettings?.connectObject('changed::compact-mode-enabled',
+            () => this._syncIndicatorStyle(), this);
+
+        // Other extensions (e.g. AppIndicator) insert at fixed indices and
+        // would land between our indicators, so pull ours back to the front.
+        Main.panel._rightBox.connectObject('child-added',
+            () => this._sortIndicators(), this);
     }
 
     disable() {
+        Main.panel._rightBox.disconnectObject(this);
         Main.sessionMode.disconnectObject(this);
+        this._traySettings?.disconnectObject(this);
+        this._traySettings = null;
         KEYBINDINGS.forEach(name => Main.wm.removeKeybinding(name));
         this._settings.disconnectObject(this);
         this._giveBackShortcuts();
@@ -265,6 +303,12 @@ export default class MinimizeToMenuBarExtension extends Extension {
             this._restore(latest);
     }
 
+    // Oldest first, so the most recently hidden window ends up on top.
+    _restoreAllWindows() {
+        for (const win of [...this._hidden.keys()])
+            this._restore(win);
+    }
+
     _hideFocusedWindow() {
         const focused = global.display.focus_window;
         if (!focused)
@@ -298,6 +342,8 @@ export default class MinimizeToMenuBarExtension extends Extension {
                 w => this._restore(w));
             Main.panel.addToStatusArea(`${this.uuid}:${key}`, indicator, 0, 'right');
             this._indicators.set(key, indicator);
+            this._sortIndicators();
+            this._syncIndicatorStyle();
             this._syncIndicatorVisibility();
         }
         indicator.addWindow(win);
@@ -345,6 +391,23 @@ export default class MinimizeToMenuBarExtension extends Extension {
             app.emit('windows-changed');
             Shell.AppSystem.get_default().emit('app-state-changed', app);
         }
+    }
+
+    // Keep our indicators leftmost in the right box, in the order they were
+    // created (Map insertion order), so newer ones sit to the right.
+    _sortIndicators() {
+        const box = Main.panel._rightBox;
+        let index = 0;
+        for (const indicator of this._indicators.values()) {
+            if (indicator.container.get_parent() === box)
+                box.set_child_at_index(indicator.container, index++);
+        }
+    }
+
+    _syncIndicatorStyle() {
+        const compact = this._traySettings?.get_boolean('compact-mode-enabled') ?? false;
+        for (const indicator of this._indicators.values())
+            indicator.setCompact(compact);
     }
 
     _syncIndicatorVisibility() {

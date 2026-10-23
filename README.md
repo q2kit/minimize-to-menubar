@@ -5,11 +5,14 @@ and parks it behind an app icon in the top bar instead of the dock.
 
 - Press **Super+H** to hide the focused window. It disappears from the screen,
   the dock, Alt+Tab and the Activities overview.
-- An icon for that app appears in the top bar, one icon per app.
+- An icon for that app appears in the top bar, one icon per app. These icons
+  sit at the left end of the tray area, before other apps' tray icons, in the
+  order the apps were first hidden (newer ones to the right).
 - Click the icon to restore the window. If the app has several hidden windows,
   a menu lists them by title, with a **Show All** entry.
 - Press **Super+Shift+H** to restore the most recently hidden window, like
   popping a stack.
+- Press **Super+Ctrl+Shift+H** to restore all hidden windows at once.
 - The icon goes away when the app has no more hidden windows.
 
 Restored windows come back exactly as they were: same position, size and
@@ -105,6 +108,21 @@ gsettings --schemadir $SCHEMA_DIR set org.gnome.shell.extensions.minimize-to-men
 |---|---|---|
 | `minimize-to-menubar-hide` | `['<Super>h']` | Hide the focused window |
 | `minimize-to-menubar-restore` | `['<Super><Shift>h']` | Restore the most recently hidden window |
+| `minimize-to-menubar-restore-all` | `['<Super><Ctrl><Shift>h']` | Restore all hidden windows |
+
+### Top bar icons
+
+- **Position**: the icons are kept at the left end of the right-hand side of the
+  top bar. Other extensions, such as AppIndicator, add their tray icons at
+  fixed positions, which would otherwise land between ours. Whenever an icon
+  is added there, the extension moves its own icons back to the front.
+- **Order**: icons keep the order in which their apps were first hidden. When
+  an app has no more hidden windows its icon is removed, and the others keep
+  their places. For example, with `a`, `b` hidden next to tray icons `x`, `y`:
+  `a b x y` → hide `c` → `a b c x y` → restore all of `b` → `a c x y`.
+- **Look**: the icons use the same padding and round highlight as tray icons,
+  and follow AppIndicator's *compact mode* setting when that extension is
+  installed.
 
 ### Other behaviour
 
@@ -139,6 +157,11 @@ live inside the shell as an extension.
 - **Removing unpinned apps from the dock** is done by overriding
   `Shell.AppSystem.get_running()` to leave out apps whose windows are all
   hidden.
+- **Top bar icons** are `PanelMenu.Button`s in the panel's right box. The icon
+  is wrapped in a `panel-status-indicators-box`, for which the theme drops the
+  icon's own padding. Ordering listens to `child-added` on
+  `Main.panel._rightBox` and moves our buttons to the front with
+  `set_child_at_index()`.
 - **Refreshing**: after hiding or restoring a window, the extension emits
   `windows-changed` on the app and `app-state-changed` on the app system, so
   the dock recounts dots and rebuilds its list.
